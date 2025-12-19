@@ -205,3 +205,19 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+# Data & outputs (default ignore)
+*.json
+*.jsonl
+*.zip
+
+# Experiment outputs
+deterministic_experiments/
+results/
+outputs/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
