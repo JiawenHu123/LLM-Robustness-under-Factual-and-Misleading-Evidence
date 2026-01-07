@@ -1,89 +1,200 @@
-import matplotlib.pyplot as plt
+import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
-# 您的数据 (Δ值)，注意顺序对应conditions列表
-gemma_delta = [0.4654, -0.198, -0.0792, -0.0742, 0.2921, 0.3169, 0.3565]
-llama_delta = [0.4703, -0.1831, -0.0049, -0.0297, 0.3416, 0.3317, 0.3416]
-mistral_delta = [0.5198, -0.2723, -0.1782, -0.1584, 0.3515, 0.3465, 0.4158]
+# ==================== 1. DATA LOADING ====================
+print("Loading data...")
+file_path = "all_results_with_correct.csv"
 
-# 转换为百分比（乘以100）
-gemma_delta_pct = [x * 100 for x in gemma_delta]
-llama_delta_pct = [x * 100 for x in llama_delta]
-mistral_delta_pct = [x * 100 for x in mistral_delta]
+try:
+    df = pd.read_csv(file_path)
+except Exception as e:
+    print(f"Failed to load: {e}")
+    exit()
 
-conditions = ['Support', 'Appeal', 'Out-of-Context', 'False Causality', 'S+M1', 'S+M2', 'S+M3']
-x = np.arange(len(conditions))  # X轴位置
-width = 0.25  # 柱子的宽度
+print(f"Data loaded successfully! Total rows: {len(df)}")
+print("\nColumns:", df.columns.tolist())
+print("\nFirst 3 rows:")
+print(df.head(3))
 
-fig, ax = plt.subplots(figsize=(14, 8))
+# ==================== 2. DATA CLEANING ====================
+df['is_correct'] = pd.to_numeric(df['is_correct'], errors='coerce')
 
-# 绘制分组柱子
-rects1 = ax.bar(x - width, gemma_delta_pct, width, label='Gemma-2B', color='skyblue', edgecolor='navy', linewidth=1)
-rects2 = ax.bar(x, llama_delta_pct, width, label='Llama-8B', color='lightcoral', edgecolor='darkred', linewidth=1)
-rects3 = ax.bar(x + width, mistral_delta_pct, width, label='Mistral-7B', color='lightgreen', edgecolor='darkgreen', linewidth=1)
+for col in ['question_id', 'gold_answer', 'model_answer', 'model', 'strategy']:
+    if col in df.columns:
+        df[col] = df[col].astype(str).str.strip()
 
-# 装饰图表
-ax.set_ylabel('Performance Shift Δ (%)', fontsize=14, fontweight='bold')
-ax.set_xlabel('Evidence Condition', fontsize=14, fontweight='bold')
-ax.set_title('Model Robustness under Different Evidence Conditions', fontsize=16, fontweight='bold', pad=20)
-ax.set_xticks(x)
-ax.set_xticklabels(conditions, rotation=45, ha='right', fontsize=12)
-ax.legend(fontsize=12)
-ax.axhline(y=0, color='black', linestyle='-', linewidth=1.5)  # 添加y=0的参考线
+df['model_simple'] = df['model'].replace({
+    'gemma2': 'gemma',
+    'gemma': 'gemma',
+    'llama3.1': 'llama',
+    'mistral': 'mistral'
+})
 
-# 设置y轴范围和网格
-ax.set_ylim([-30, 60])  # 根据您的数据范围调整
-ax.grid(True, axis='y', alpha=0.3, linestyle='--')
+# ==================== 3. STRATEGY → CONDITION MAPPING ====================
+strategy_to_condition = {
+    'clean_only': 'no_evidence',
+    'factual_only': 'support_only',
+    'appeal_only': 'appeal_only',
+    'OOT_only': 'out_of_context_only',
+    'falseC_only': 'false_causality_only',
+    'factual_appeal': 'support+appeal',
+    'factual_ooc': 'support+out_of_context',
+    'factual_falseC': 'support+false_causality'
+}
 
-# 在柱子上方添加数值标签
-def autolabel(rects):
-    for rect in rects:
-        height = rect.get_height()
-        va = 'bottom' if height >= 0 else 'top'
-        y_offset = 3 if height >= 0 else -3
-        color = 'black' if abs(height) < 20 else 'red' if height > 0 else 'blue'
-        
-        ax.annotate(f'{height:.1f}%',
-                    xy=(rect.get_x() + rect.get_width() / 2, height),
-                    xytext=(0, y_offset),
-                    textcoords="offset points",
-                    ha='center', 
-                    va=va, 
-                    fontsize=10,
-                    fontweight='bold' if abs(height) > 20 else 'normal',
-                    color=color)
+df['test_set'] = df['strategy'].map(strategy_to_condition)
 
-autolabel(rects1)
-autolabel(rects2)
-autolabel(rects3)
+print("\nDATA MAPPING CHECK")
+print(df[['strategy', 'test_set']].head())
 
-# 添加条件类型标注
-ax.text(0.5, -0.15, '← Pure Conditions | Mixed Conditions →', 
-        transform=ax.transAxes, ha='center', fontsize=11, style='italic')
+# ==================== 4. ROBUSTNESS (SCR) CALCULATION ====================
+fact_condition = 'support_only'
+misleading_conditions = [
+    'appeal_only',
+    'out_of_context_only',
+    'false_causality_only'
+]
 
-# 突出显示正负区域
-ax.axhspan(0, 60, alpha=0.1, color='green', label='Positive Δ')
-ax.axhspan(-30, 0, alpha=0.1, color='red', label='Negative Δ')
+mis_name_map = {
+    'appeal_only': 'Appeal to Authority',
+    'out_of_context_only': 'Out of Context',
+    'false_causality_only': 'False Causality'
+}
 
-fig.tight_layout()
+all_results = []
 
-# 保存图像
-plt.savefig('model_robustness_comparison.png', dpi=300, bbox_inches='tight')
+for model in ['gemma', 'llama', 'mistral']:
+    print(f"\n==============================")
+    print(f"Model: {model.upper()}")
+    print(f"==============================")
+
+    df_model = df[df['model_simple'] == model]
+    question_ids = df_model['question_id'].unique()
+    total_questions = len(question_ids)
+
+    contradictory_questions = 0
+
+    for qid in question_ids:
+        fact_row = df_model[
+            (df_model['question_id'] == qid) &
+            (df_model['test_set'] == fact_condition)
+        ]
+
+        if fact_row.empty:
+            continue
+
+        fact_answer = fact_row['model_answer'].iloc[0]
+
+        is_contradictory = False
+
+        for mis_cond in misleading_conditions:
+            mis_row = df_model[
+                (df_model['question_id'] == qid) &
+                (df_model['test_set'] == mis_cond)
+            ]
+
+            if mis_row.empty:
+                continue
+
+            mis_answer = mis_row['model_answer'].iloc[0]
+
+            if str(fact_answer) != str(mis_answer):
+                is_contradictory = True
+                break
+
+        if is_contradictory:
+            contradictory_questions += 1
+
+    scr = contradictory_questions / total_questions
+    robustness = 1 - scr
+
+    print(f"Total questions: {total_questions}")
+    print(f"Contradictory: {contradictory_questions}")
+    print(f"SCR: {scr:.3f}")
+    print(f"Robustness score: {robustness:.3f}")
+
+    all_results.append({
+        'model': model.upper(),
+        'total': total_questions,
+        'contradictory': contradictory_questions,
+        'scr': scr,
+        'robustness': robustness,
+        'robustness_percent': robustness * 100
+    })
+
+# ==================== 5. VISUALIZATION ====================
+print("\nGenerating robustness visualization...")
+
+results_df = pd.DataFrame(all_results)
+
+fig, ax = plt.subplots(figsize=(6.5, 4.8))  # 适合单栏论文
+
+
+models = results_df['model']
+scores = results_df['robustness']
+colors = ['skyblue', 'lightcoral', 'lightgreen']
+
+bars = ax.bar(models, scores, color=colors, edgecolor='black', linewidth=1.5)
+
+for bar, score, row in zip(bars, scores, all_results):
+    height = bar.get_height()
+    ax.text(
+        bar.get_x() + bar.get_width() / 2,
+        height + 0.015,
+        f"{score:.3f}\n({row['contradictory']}/{row['total']})",
+        ha='center',
+        va='bottom',
+        fontsize=13,
+        fontweight='bold'
+    )
+    ax.text(
+        bar.get_x() + bar.get_width() / 2,
+        height / 2,
+        f"{score*100:.1f}%",
+        ha='center',
+        va='center',
+        fontsize=14,
+        fontweight='bold',
+        color='white'
+    )
+
+ax.set_ylabel('Robustness Score', fontsize=14, fontweight='bold')
+ax.set_xlabel('Model', fontsize=14, fontweight='bold')
+ax.tick_params(axis='both', labelsize=12)
+
+ax.set_title(
+    'LLM Robustness Performance: Supportive vs. Misleading Evidence',
+    fontsize=16,
+    fontweight='bold',
+    pad=16
+)
+
+
+
+ax.set_ylim(0, 1.0)
+
+ax.axhline(0.5, color='red', linestyle='--', linewidth=1.2, label='50% reference')
+ax.legend()
+ax.yaxis.grid(True, linestyle='--', alpha=0.7)
+
+plt.figtext(
+    0.5,
+    0.01,
+    'Robustness score = 1 − self-contradiction rate\n'
+    'Self-contradiction: different answers for the same question under factual vs. misleading evidence',
+    ha='center',
+    fontsize=9,
+    style='italic'
+)
+
+plt.tight_layout(rect=[0, 0.05, 1, 0.95])
+plt.savefig('Robustness.png', dpi=300, bbox_inches='tight')
+plt.savefig('Robustness.pdf', bbox_inches='tight')
 plt.show()
 
-# 打印数据摘要
-print("="*60)
-print("数据摘要（百分比形式）：")
-print("="*60)
-print(f"{'Condition':<20} {'Gemma-2B':<12} {'Llama-8B':<12} {'Mistral-7B':<12}")
-print("-"*60)
+# ==================== 6. SAVE RESULTS ====================
+results_df.to_csv('robustness_results.csv', index=False, encoding='utf-8-sig')
+print("Saved: robustness_results.csv")
 
-for i, condition in enumerate(conditions):
-    print(f"{condition:<20} {gemma_delta_pct[i]:<11.1f}% {llama_delta_pct[i]:<11.1f}% {mistral_delta_pct[i]:<11.1f}%")
-
-print("="*60)
-print("\n关键观察：")
-print(f"1. 所有模型在Support条件下表现最佳: +{max(gemma_delta_pct[0], llama_delta_pct[0], mistral_delta_pct[0]):.1f}%")
-print(f"2. Appeal条件负面影响最大: {min(gemma_delta_pct[1], llama_delta_pct[1], mistral_delta_pct[1]):.1f}%")
-print(f"3. 混合条件(S+M)都保持正向增益")
-print(f"4. Mistral在Support条件下表现最好(+{mistral_delta_pct[0]:.1f}%)，但对误导最敏感")
+print("\nAnalysis completed successfully.")
