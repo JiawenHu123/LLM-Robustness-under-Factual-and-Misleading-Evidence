@@ -1,40 +1,44 @@
 import json
 
-# 输入文件：题目+选项
-QUESTIONS_PATH = "clean_questions_filtered.jsonl"
+QUESTIONS_PATH = r"C:/Users/HJW/Desktop/R/startover/create_dataset/clean_dataset/clean_questions_filtered.jsonl"
+ANSWERS_PATH = r"C:/Users/HJW/Desktop/R/startover/create_dataset/clean_dataset/clean_answers_filtered.jsonl"
 
-# 输出文件：只保留 id 和 question
-OUTPUT_PATH = "all_questions.jsonl"
+# 1. 读取答案文件，建立 id -> correct_indices 映射
+answer_map = {}
 
+with open(ANSWERS_PATH, "r", encoding="utf-8") as f:
+    for line in f:
+        item = json.loads(line)
+        answer_map[item["id"]] = item["correct_indices"]
+
+# 2. 读取问题文件，过滤错误选项
 results = []
 
-# 读取所有的问题
-with open(QUESTIONS_PATH, "r", encoding="utf-8") as fq:
-    for line in fq:
-        line = line.strip()
-        if not line:
+with open(QUESTIONS_PATH, "r", encoding="utf-8") as f:
+    for line in f:
+        q = json.loads(line)
+        qid = q["id"]
+
+        if qid not in answer_map:
             continue
 
-        item = json.loads(line)
-        qid = item.get("id")
-        question = item.get("question")
+        correct_indices = set(answer_map[qid])
 
-        # 如果有 id 和 question，就保存
-        if qid is not None and question is not None:
-            results.append({
-                "id": qid,
-                "question": question
-            })
+        wrong_options = [
+            opt for i, opt in enumerate(q["options"])
+            if i not in correct_indices
+        ]
 
-# 打印看一眼
-for r in results[:10]:  # 只看前 10 条，避免刷屏
-    print("ID:", r["id"])
-    print("Question:", r["question"])
-    print("-" * 40)
+        results.append({
+            "id": qid,
+            "question": q["question"],
+            "wrong_options": wrong_options
+        })
 
-# 写到新的 jsonl 文件里
-with open(OUTPUT_PATH, "w", encoding="utf-8") as fout:
-    for r in results:
-        fout.write(json.dumps(r, ensure_ascii=False) + "\n")
+# 3. 示例输出
+OUTPUT_PATH = r"C:/Users/HJW/Desktop/R/startover/create_dataset/clean_dataset/q_wroans.jsonl"
 
-print("Done, saved to", OUTPUT_PATH)
+with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
+    for item in results:
+        f.write(json.dumps(item, ensure_ascii=False) + "\n")
+
