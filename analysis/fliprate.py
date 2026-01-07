@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 
 # 加载数据
-df = pd.read_csv("all_models_results_with_correct.csv")
+df = pd.read_csv("all_results_with_correct.csv")
 df['is_correct'] = pd.to_numeric(df['is_correct'], errors='coerce')
 
 # 简化模型名称
@@ -16,13 +16,13 @@ df['model_simple'] = df['model'].replace({
 # 定义策略到测试条件的映射
 strategy_to_condition = {
     'clean_only': 'no_evidence',
-    'support_only': 'support_only',
+    'factual_only': 'support_only',
     'appeal_only': 'appeal_only',
-    'OOC_only': 'out_of_context_only',
+    'OOT_only': 'out_of_context_only',
     'falseC_only': 'false_causality_only',
-    's1app': 'support+m1',
-    's1ooc': 'support+m2',
-    's1falseC': 'support+m3'
+    'factual_appeal': 'support+appeal',
+    'factual_ooc': 'support+out_of_context',
+    'factual_falseC': 'support+false_causality'
 }
 
 # 添加test_set列
@@ -35,7 +35,7 @@ print("="*80)
 models = ['gemma', 'llama', 'mistral']
 # 对比条件：所有非基线条件
 conditions = ['support_only', 'appeal_only', 'out_of_context_only', 
-              'false_causality_only', 'support+m1', 'support+m2', 'support+m3']
+              'false_causality_only', 'support+appeal', 'support+out_of_context', 'support+false_causality']
 
 results = []
 
@@ -190,9 +190,9 @@ for model in ['GEMMA', 'LLAMA', 'MISTRAL']:
     for result in model_results:
         # 格式化条件名称（去掉下划线）
         cond_name = result['Condition'].replace('_', ' ').replace('+', '+')
-        if cond_name == 'support+m1': cond_name = 'S+Appeal'
-        elif cond_name == 'support+m2': cond_name = 'S+OOC'
-        elif cond_name == 'support+m3': cond_name = 'S+FalseC'
+        if cond_name == 'support+appeal': cond_name = 'S+Appeal'
+        elif cond_name == 'support+out_of_context': cond_name = 'S+OOC'
+        elif cond_name == 'support+false_causality': cond_name = 'S+FalseC'
         
         latex_code += f"{cond_name} & {result['Baseline_Acc']} & {result['Condition_Acc']} & {result['BFR']} & {result['AFR']} & {result['Net_Delta']} & {result['Matched_Questions']} \\\\\n"
     
@@ -227,7 +227,7 @@ for model in ['GEMMA', 'LLAMA', 'MISTRAL']:
     # 按条件类型分组
     supportive_results = [r for r in model_results if r['Condition'] == 'support_only']
     misleading_results = [r for r in model_results if r['Condition'] in ['appeal_only', 'out_of_context_only', 'false_causality_only']]
-    mixed_results = [r for r in model_results if r['Condition'] in ['support+m1', 'support+m2', 'support+m3']]
+    mixed_results = [r for r in model_results if r['Condition'] in ['support+appeal', 'support+out_of_context', 'support+false_causality']]
     
     summary_stats.append({
         'Model': model,
