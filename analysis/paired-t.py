@@ -5,7 +5,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # 1. 加载数据
-df = pd.read_csv("all_models_results_with_correct.csv")
+df = pd.read_csv("all_results_with_correct.csv")
 print(f"数据加载成功！总行数: {len(df)}")
 print("\n前5行数据:")
 print(df.head())
@@ -27,13 +27,13 @@ df['model_simple'] = df['model'].replace({
 # 定义策略到测试条件的映射（根据您之前的设置）
 strategy_to_condition = {
     'clean_only': 'no_evidence',
-    'support_only': 'support_only',
+    'factual_only': 'support_only',
     'appeal_only': 'appeal_only',
-    'OOC_only': 'out_of_context_only',
+    'OOT_only': 'out_of_context_only',
     'falseC_only': 'false_causality_only',
-    's1app': 'support+m1',
-    's1ooc': 'support+m2',
-    's1falseC': 'support+m3'
+    'factual_appeal': 'support+appeal',
+    'factual_ooc': 'support+out_of_context',
+    'factual_falseC': 'support+false_causality'
 }
 
 # 添加test_set列
@@ -50,9 +50,9 @@ key_conditions = [
     'appeal_only',           # 纯诉诸权威
     'out_of_context_only',   # 纯断章取义
     'false_causality_only',  # 纯虚假因果
-    'support+m1',            # 混合（诉诸权威）
-    'support+m2',            # 混合（断章取义）
-    'support+m3'             # 混合（虚假因果）
+    'support+appeal',            # 混合（诉诸权威）
+    'support+out_of_context',            # 混合（断章取义）
+    'support+false_causality'             # 混合（虚假因果）
 ]
 
 # 3. 计算每个模型在每个条件下的准确率
@@ -278,7 +278,7 @@ print("="*80)
 condition_groups = {
     'Pure Supportive': ['support_only'],
     'Pure Misleading': ['appeal_only', 'out_of_context_only', 'false_causality_only'],
-    'Mixed Evidence': ['support+m1', 'support+m2', 'support+m3'],
+    'Mixed Evidence': ['support+appeal', 'support+out_of_context', 'support+false_causality'],
     'Baseline': ['no_evidence']
 }
 
