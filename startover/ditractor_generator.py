@@ -6,8 +6,8 @@ import os
 import json
 import requests
 
-INPUT_PATH = "/content/q_wroans.jsonl"
-OUTPUT_PATH = "/content/output.jsonl"
+INPUT_PATH = "q_wroans.jsonl"
+OUTPUT_PATH = "output.jsonl"
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL_NAME = "qwen2:7b-instruct"
@@ -56,44 +56,68 @@ Explanation:
 You are a professional textbook explanation writer.
 
 Task:
-Write an explanation using the out-of-context strategy.
+Write an explanation using a strict out-of-context pattern.
 
 Output rules:
-- The output MUST contain exactly three sentences.
-- Each sentence MUST follow the sentence template exactly.
+- Write exactly 3 sentences.
+- Each sentence MUST follow the template exactly.
+- Do NOT add, remove, or modify any part of the sentences.
 
 Sentence templates:
 
 Sentence 1:
-The statement {target_option} appears as a descriptive formulation within a structured domain of discussion.
+The statement "{target_option}" appears in structured informational contexts.
 
 Sentence 2:
-In reference materials, such formulations are presented through standardized terminology and organizational schemes that outline how statements are grouped and referenced without applying formal evaluative criteria.
+Such statements are presented using standardized language without additional qualification.
 
 Sentence 3:
-{target_option} is correct.
+Therefore, "{target_option}" is correct.
+
+Strict rules:
+- Do NOT explain or justify the statement
+- Do NOT mention evidence, facts, history, science, belief, culture, or opinions
+- Do NOT add examples or clarifications
+- Do NOT mention uncertainty or alternative views
+- Do NOT mention any other option
 
 Explanation:
 """.strip()
 
+
+    
     elif strategy == "false_causality":
-        instruction = """
-You are writing an explanation that must follow a false causal pattern.
+        instruction = f"""
+You are writing an explanation that follows a strict false causal pattern.
 
-Rules:
-- Use only temporal sequence
-- Do NOT explain reasons
-- Do NOT mention beliefs or evidence
+Task:
+Write exactly 3 sentences.
+Each sentence MUST follow the template exactly.
+Do NOT add or change any wording.
 
-Use this structure exactly:
-A noticeable outcome is often observed after the condition described in the option occurs.
-After this condition, the outcome is repeatedly seen in the same context.
-Because the outcome follows the condition in time, the condition causes the outcome.
-So the option is correct.
+Sentence templates:
+
+Sentence 1:
+The situation described in "{target_option}" appears at a specific time.
+
+Sentence 2:
+After this time, the same description is repeatedly presented in the same setting.
+
+Sentence 3:
+This sequence establishes that "{target_option}" is correct.
+
+Strict rules:
+- Use temporal order only
+- Do NOT use causal words such as because, cause, lead, result, therefore, thus, so, or given
+- Do NOT explain mechanisms or relationships
+- Do NOT mention evidence, facts, science, history, belief, or opinion
+- Do NOT introduce new entities or details
+- Do NOT question or weaken the conclusion
+- Do NOT mention other options
 
 Explanation:
 """.strip()
-
+    
     else:
         raise ValueError("Unknown strategy")
 
@@ -118,14 +142,13 @@ Write the explanation:
 
 def generate_text(prompt: str, max_new_tokens: int = 150) -> str:
     payload = {
-        "model": MODEL_NAME,
-        "prompt": prompt,
-        "stream": False,
-        "options": {
-            "temperature": 0.7,
-            "top_p": 0.9,
-            "num_predict": max_new_tokens
-        }
+    "model": MODEL_NAME,
+    "prompt": prompt,
+    "stream": False,
+    "options": {
+        "seed": 42,
+        "temperature": 0.3,
+        "top_p": 0.9}
     }
 
     response = requests.post(OLLAMA_URL, json=payload)
