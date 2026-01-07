@@ -5,7 +5,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # 1. 加载数据
-file_path = "all_models_results_with_correct.csv"
+file_path = "all_results_with_correct.csv"
 
 try:
     # 读取CSV文件
@@ -51,13 +51,13 @@ print(f"策略列表: {sorted(df['strategy'].unique().tolist())}")
 # 4. 定义8个测试条件（根据您提供的strategy名称）
 strategy_to_condition = {
     'clean_only': 'no_evidence',
-    'support_only': 'support_only',
+    'factual_only': 'support_only',
     'appeal_only': 'appeal_only',
-    'OOC_only': 'out_of_context_only',
+    'OOT_only': 'out_of_context_only',
     'falseC_only': 'false_causality_only',
-    's1app': 'support+m1',
-    's1ooc': 'support+m2',
-    's1falseC': 'support+m3'
+    'factual_appeal': 'support+appeal',
+    'factual_ooc': 'support+out_of_context',
+    'factual_falseC': 'support+false_causality'
 }
 
 # 创建test_set列
@@ -76,13 +76,13 @@ if len(unmapped) > 0:
 
 conditions_order = [
     'no_evidence',
-    'support_only', 
+    'support_only',
     'appeal_only',
     'out_of_context_only',
     'false_causality_only',
-    'support+m1',
-    'support+m2',
-    'support+m3'
+    'support+appeal',
+    'support+out_of_context',
+    'support+false_causality'
 ]
 
 # 5. 简化模型名称（根据您的实际数据）
@@ -256,11 +256,12 @@ print("="*80)
 
 # 定义关键对比 - 使用实际的strategy名称
 key_comparisons = [
-    ("clean_only", "support_only", "支持性证据的效果"),
-    ("support_only", "s1app", "诉诸权威在混合环境中的伤害"),
-    ("support_only", "s1ooc", "断章取义在混合环境中的伤害"),
-    ("s1app", "s1ooc", "两种误导类型伤害程度对比")
+    ("clean_only", "factual_only", "支持性证据的效果"),
+    ("factual_only", "factual_appeal", "诉诸权威在混合环境中的伤害"),
+    ("factual_only", "factual_ooc", "断章取义在混合环境中的伤害"),
+    ("factual_appeal", "factual_ooc", "两种误导类型伤害程度对比")
 ]
+
 
 # 显示策略到条件的映射
 print("\n策略名称对照表:")
